@@ -13,8 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 
 from app.config import settings
-from app.routers import images
-from app.routers import auth
+from app.routers import images, auth, hotspots
 
 
 # Create FastAPI app instance
@@ -37,6 +36,7 @@ app.add_middleware(
 # Routers
 app.include_router(auth.router)
 app.include_router(images.router)
+app.include_router(hotspots.router)
 
 # Serve static files (uploads folder)
 app.mount("/static", StaticFiles(directory="static"), name="static")

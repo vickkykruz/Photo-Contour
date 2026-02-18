@@ -8,6 +8,9 @@
 
 
 from .image_service import save_uploaded_image, get_image_by_id
+from . import detection_service, svg_service
 
 
-__all__ = ["save_uploaded_image", "get_image_by_id"]
+__all__ = ["save_uploaded_image", "get_image_by_id",
+           "detection_service", "svg_service"
+]

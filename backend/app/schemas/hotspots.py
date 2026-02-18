@@ -5,3 +5,43 @@
     (user text + link bound to a detected region), and SVG generation
     responses.
 """
+
+
+from pydantic import BaseModel
+from typing import List
+
+
+class BBox(BaseModel):
+    """Axis-aligned bounding box in image coordinates."""
+    x: int
+    y: int
+    width: int
+    height: int
+    
+    
+class DetectedObject(BaseModel):
+    """Single detected object returned by detection service."""
+    id: int              # simple index
+    label: str           # e.g. 'poster'
+    score: float         # confidence (stubbed)
+    bbox: BBox
+    
+    
+class DetectionResult(BaseModel):
+    """List of detected objects for an image."""
+    image_id: int
+    objects: List[DetectedObject]
+    
+    
+class HotspotCreate(BaseModel):
+    """Data needed to create a hotspot and generate SVG."""
+    image_id: int
+    object_id: int       # index of selected detected object
+    text: str
+    link: str
+    
+    
+class SvgResponse(BaseModel):
+    """Generated SVG document as a string."""
+    image_id: int
+    svg: str
