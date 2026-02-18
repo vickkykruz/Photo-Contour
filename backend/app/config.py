@@ -8,6 +8,7 @@
 
 from pydantic_settings import BaseSettings
 from typing import List
+import os
 
 class Settings(BaseSettings):
     # Database
@@ -22,6 +23,10 @@ class Settings(BaseSettings):
     # Server
     PROJECT_NAME: str = "Photo Contour API"
     VERSION: str = "0.1.0"
+    
+    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY")
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     
     class Config:
         env_file = ".env"

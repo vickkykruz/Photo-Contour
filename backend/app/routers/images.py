@@ -17,6 +17,8 @@ from app import schemas, services
 from app.db.base import get_db
 from app.models import Image
 from app.config import settings
+from app.core.deps import get_current_user
+from app.models import User
 
 
 router = APIRouter(prefix="/images", tags=["images"])
@@ -25,7 +27,8 @@ router = APIRouter(prefix="/images", tags=["images"])
 @router.post("/", response_model=schemas.ImageResponse)
 async def upload_image(
     file: UploadFile = File(..., description="Image file to upload"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Upload a new image.

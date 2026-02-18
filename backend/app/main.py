@@ -11,8 +11,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+
 from app.config import settings
 from app.routers import images
+from app.routers import auth
 
 
 # Create FastAPI app instance
@@ -33,6 +35,7 @@ app.add_middleware(
 )
 
 # Routers
+app.include_router(auth.router)
 app.include_router(images.router)
 
 # Serve static files (uploads folder)

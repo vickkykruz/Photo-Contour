@@ -7,6 +7,10 @@
 
 
 from .images import ImageResponse, ImageCreate, ImageBase
+from .auth import UserCreate, UserLogin, Token, UserOut
 
 
-__all__ = ["ImageResponse", "ImageCreate", "ImageBase"]
+__all__ = [
+    "ImageResponse", "ImageCreate", "ImageBase",
+    "UserCreate", "UserLogin", "Token", "UserOut"
+]
