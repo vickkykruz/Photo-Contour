@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
+from app.routers import images
 
 
 # Create FastAPI app instance
@@ -30,6 +31,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Routers
+app.include_router(images.router)
 
 # Serve static files (uploads folder)
 app.mount("/static", StaticFiles(directory="static"), name="static")
