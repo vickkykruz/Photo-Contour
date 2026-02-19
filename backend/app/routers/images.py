@@ -53,7 +53,7 @@ async def upload_image(
 
 
 @router.get("/{image_id}", response_model=schemas.ImageResponse)
-def get_image(image_id: int, db: Session = Depends(get_db)):
+def get_image(image_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get image metadata by ID."""
     image = services.get_image_by_id(db, image_id)
     if not image:
@@ -69,7 +69,7 @@ def list_images(db: Session = Depends(get_db)):
 
 
 @router.get("/{image_id}/file")
-def get_image_file(image_id: int, db: Session = Depends(get_db)):
+def get_image_file(image_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     Return the raw image file for a given image ID.
 
