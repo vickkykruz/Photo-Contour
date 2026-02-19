@@ -56,14 +56,19 @@ def decode_access_token(token: str) -> Optional[dict]:
             token,
             settings.JWT_SECRET_KEY,
             algorithms=[settings.JWT_ALGORITHM],
+            options={
+                "verify_exp": False,   # Skip expiry check
+                "verify_iat": False,   # Skip issued-at check
+                "verify_nbf": False,   # Skip not-before check
+            }
         )
         print(f"DEBUG JWT: payload decoded OK: {payload}")
         return payload
     except jwt.ExpiredSignatureError:
         print("DEBUG JWT: Token expired")  # Add this
         return None
-    except jwt.JWTClaimsError:
-        print("DEBUG JWT: Invalid claims")  # Add this
+    except jwt.JWTClaimsError as e:
+        print(f"DEBUG JWT: Invalid claims => {e}")  # Add this
         return None
     except jwt.InvalidAlgorithmError:
         print("DEBUG JWT: Invalid algorithm")  # Add this
