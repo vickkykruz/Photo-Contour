@@ -23,15 +23,12 @@ router = APIRouter(prefix="/hotspots", tags=["hotspots"])
 @router.post("/detect/{image_id}", response_model=DetectionResult)
 def detect_objects(image_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
-    Run REAL YOLOv8 object detection on the given image.
+    Run YOLOv8 SEGMENTATION on the given image.
 
-    Returns a single bounding box in the center of the image.
+    Returns object contours (not rectangles).
     """
-    try:
-        result = detection_service.run_yolo_detection(db, image_id)
-        return result
-    except ValueError as e:
-        raise HTTPException(status_code=500, detail=f"Detection failed: {str(e)}")
+    result = detection_service.run_yolo_segmentation(db, image_id)
+    return DetectionResult(**result)
     
     
 @router.post("/generate-svg", response_model=SvgResponse)
@@ -40,14 +37,4 @@ def generate_svg(hotspot: HotspotCreate, db: Session = Depends(get_db), current_
     Generate a simple SVG that highlights the selected object
     and attaches the provided text and link.
     """
-    # Run fake detection again to get boxes
-    try:
-        detection = detection_service.run_fake_detection(db, hotspot.image_id)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-    try:
-        svg = svg_service.generate_simple_svg(db, detection, hotspot)
-        return svg
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    return svg_service.generate_interactive_svg(db, hotspot)

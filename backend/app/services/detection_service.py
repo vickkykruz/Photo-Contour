@@ -7,18 +7,19 @@
 """
 
 
-from typing import List
 import cv2
+import numpy as np
 from ultralytics import YOLO
-from sqlalchemy.orm import Session
+from typing import List, Dict
 from pathlib import Path
+from sqlalchemy.orm import Session
 
 from app.models import Image
 from app.schemas.hotspots import BBox, DetectedObject, DetectionResult
 
 
 # Load YOLOv8 model ONCE at module import (singleton pattern)
-_model = YOLO("yolov8n.pt")  # nano model, fast + good enough
+_model = YOLO("yolov8n-seg.pt")  # nano segmentation model (fast)
 
 
 # Basic Object detection
@@ -48,39 +49,34 @@ def run_yolo_detection(db: Session, image_id: int) -> DetectionResult:
         raise ValueError("Image file not found")
     
     # Run YOLOv8 inference
-    results = _model(image.filepath, verbose=False)
+    results = _model(image.filepath, verbose=False, device='cpu', imgsz=640, conf=0.25, retina_masks=True)[0]
     
     objects = []
-    for r in results:
-        boxes = r.boxes
-        if boxes is not None:
-            for box in boxes:
-                # Extract bbox, confidence, class
-                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                conf = box.conf[0].cpu().numpy()
-                cls_id = int(box.cls[0].cpu().numpy())
-                
-                # Filter low confidence (< 0.5)
-                if conf < 0.5:
-                    continue
-                
-                label = COCO_CLASSES[cls_id]
-                w = x2 - x1
-                h = y2 - y1
-                
-                detected = DetectedObject(
-                    id=len(objects),
-                    label=label,
-                    score=float(conf),
-                    bbox=BBox(
-                        x1=float(x1), y1=float(y1),
-                        x2=float(x2), y2=float(y2),
-                        width=float(w), height=float(h)
-                    )
-                )
-                objects.append(detected)
+    img_h, img_w = results.orig_shape
+
+    for i, r in enumerate(results):
+        if r.masks is not None:
+            # Get contour points directly from mask (hugs object shape)
+            contour = r.masks.xy[0].astype(np.int32)  # [[x1,y1], [x2,y2], ...]
+            
+            # Convert to normalized SVG coordinates (0-1 scale)
+            contour_svg = [(pt[0]/img_w, pt[1]/img_h) for pt in contour]
+            
+            objects.append({
+                "id": i,
+                "label": _model.names[int(r.boxes.cls[0])],
+                "score": float(r.boxes.conf[0]),
+                "contour": contour_svg,  # Exact object outline points
+                "bbox": {  # Fallback rectangle for reference
+                    "x1": float(r.boxes.xyxy[0][0]/img_w),
+                    "y1": float(r.boxes.xyxy[0][1]/img_w),
+                    "x2": float(r.boxes.xyxy[0][2]/img_w),
+                    "y2": float(r.boxes.xyxy[0][3]/img_w),
+                }
+            })
+
     
-    return DetectionResult(image_id=image_id, objects=objects)
+    return {"image_id": image_id, "width": img_w, "height": img_h, "objects": objects}
 
 
 def run_fake_detection(db: Session, image_id: int) -> DetectionResult:

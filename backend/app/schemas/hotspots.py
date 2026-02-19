@@ -32,12 +32,15 @@ class DetectedObject(BaseModel):
     id: int              # simple index
     label: str           # e.g. 'poster'
     score: float         # confidence (stubbed)
+    contour: List[List[float]]  # [[x1,y1], [x2,y2], ...] normalized 0-1
     bbox: BBox
     
     
 class DetectionResult(BaseModel):
     """List of detected objects for an image."""
     image_id: int
+    width: int
+    height: int
     objects: List[DetectedObject]
     
     
