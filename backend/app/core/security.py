@@ -32,8 +32,13 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     Create a signed JWT access token containing the given data.
     """
     to_encode = data.copy()
+    
+    # 🔥 ADD iat (Issued At) claim - REQUIRED by modern JWT libraries
+    to_encode.update({"iat": datetime.utcnow()})
+    
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
+    
     encoded_jwt = jwt.encode(
         to_encode,
         settings.JWT_SECRET_KEY,
