@@ -9,6 +9,7 @@
 
 import cv2
 import numpy as np
+import torch.serialization
 from ultralytics import YOLO
 from typing import List, Dict
 from pathlib import Path
@@ -17,6 +18,9 @@ from sqlalchemy.orm import Session
 from app.models import Image
 from app.schemas.hotspots import BBox, DetectedObject, DetectionResult
 
+
+# Allow YOLO classes for PyTorch 2.6+
+torch.serialization.add_safe_globals(['ultralytics.nn.tasks.SegmentationModel'])
 
 # Load YOLOv8 model ONCE at module import (singleton pattern)
 _model = YOLO("yolov8n-seg.pt")  # nano segmentation model (fast)
