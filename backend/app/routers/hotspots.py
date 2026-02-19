@@ -21,15 +21,15 @@ router = APIRouter(prefix="/hotspots", tags=["hotspots"])
 @router.post("/detect/{image_id}", response_model=DetectionResult)
 def detect_objects(image_id: int, db: Session = Depends(get_db)):
     """
-    Run fake object detection on the given image.
+    Run REAL YOLOv8 object detection on the given image.
 
     Returns a single bounding box in the center of the image.
     """
     try:
-        result = detection_service.run_fake_detection(db, image_id)
+        result = detection_service.run_yolo_detection(db, image_id)
         return result
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Detection failed: {str(e)}")
     
     
 @router.post("/generate-svg", response_model=SvgResponse)

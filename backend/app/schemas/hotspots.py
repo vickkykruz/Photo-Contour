@@ -11,12 +11,20 @@ from pydantic import BaseModel
 from typing import List
 
 
+class Point(BaseModel):
+    """Align point in the image"""
+    x: float
+    y: float
+
+
 class BBox(BaseModel):
     """Axis-aligned bounding box in image coordinates."""
-    x: int
-    y: int
-    width: int
-    height: int
+    x1: float
+    y1: float
+    x2: float  
+    y2: float
+    width: float
+    height: float
     
     
 class DetectedObject(BaseModel):

@@ -1,10 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="307" height="348">
-  <image href="static/uploads/poster.webp" x="0" y="0" width="307" height="348" />
-  <a href="https://example.com">
-    <rect x="77" y="87"
-          width="153" height="174"
-          fill="none" stroke="gold" stroke-width="4">
-      <title>Walk Alone Poster</title>
-    </rect>
-  </a>
+  <style>
+    .hotspot-info { opacity: 0; transition: opacity 0.2s; }
+    .hotspot:hover .hotspot-info { opacity: 1; }
+    .hotspot-rect { stroke: gold; stroke-width: 4; fill: rgba(0,0,0,0); }
+  </style>
+
+  <image href="data:image/webp;base64,...." x="0" y="0" width="307" height="348" />
+
+  <g class="hotspot">
+    <rect class="hotspot-rect" x="77" y="87" width="153" height="174" />
+    <foreignObject x="77" y="70" width="180" height="80" class="hotspot-info">
+      <body xmlns="http://www.w3.org/1999/xhtml"
+            style="background: rgba(0,0,0,0.7); color: white; font-size: 12px; padding: 4px;">
+        <div>Walk Alone Poster<br/>
+          <a href="https://example.com" style="color: yellow;">Buy tickets</a>
+        </div>
+      </body>
+    </foreignObject>
+  </g>
 </svg>
