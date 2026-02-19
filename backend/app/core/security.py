@@ -52,6 +52,23 @@ def decode_access_token(token: str) -> Optional[dict]:
             settings.JWT_SECRET_KEY,
             algorithms=[settings.JWT_ALGORITHM],
         )
+        print(f"DEBUG JWT: payload decoded OK: {payload}")
         return payload
-    except JWTError:
+    except jwt.ExpiredSignatureError:
+        print("DEBUG JWT: Token expired")  # Add this
+        return None
+    except jwt.JWTClaimsError:
+        print("DEBUG JWT: Invalid claims")  # Add this
+        return None
+    except jwt.InvalidAlgorithmError:
+        print("DEBUG JWT: Invalid algorithm")  # Add this
+        return None
+    except jwt.InvalidTokenError as e:
+        print(f"DEBUG JWT: Invalid token error: {e}")  # Add this
+        return None
+    except JWTError as e:
+        print(f"DEBUG JWT: JWTError: {e}")
+        return None
+    except Exception as e:
+        print(f"DEBUG JWT: Unexpected error: {e}")  # Add this
         return None
