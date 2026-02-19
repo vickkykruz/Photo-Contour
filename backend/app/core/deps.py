@@ -30,6 +30,11 @@ async def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid auth scheme")
     
     token = credentials.credentials
+    if token.startswith("Bearer "):
+        token = token[7:]  # Remove "Bearer " prefix
+        
+    print(f"DEBUG: Token preview: {token[:20]}...")  # Keeping this temporarily
+    
     payload = decode_access_token(token)
     if payload is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid/expired token")
