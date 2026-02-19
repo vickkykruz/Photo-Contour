@@ -20,6 +20,7 @@ from app.schemas.hotspots import BBox, DetectedObject, DetectionResult
 
 # Load YOLOv8 model ONCE at module import (singleton pattern)
 _model = YOLO("yolov8n-seg.pt")  # nano segmentation model (fast)
+_model.to("cpu")
 
 
 # Basic Object detection
@@ -49,7 +50,13 @@ def run_yolo_detection(db: Session, image_id: int) -> DetectionResult:
         raise ValueError("Image file not found")
     
     # Run YOLOv8 inference
-    results = _model(image.filepath, verbose=False, device='cpu', imgsz=640, conf=0.25, retina_masks=True)[0]
+    results = _model(
+        image.filepath,
+        verbose=False,
+        device='cpu',
+        imgsz=640,
+        conf=0.25,
+        retina_masks=True)[0]
     
     objects = []
     img_h, img_w = results.orig_shape
