@@ -13,6 +13,6 @@ passlib[bcrypt]==1.7.4
 ultralytics==8.2.7
 opencv-python==4.10.0.84
 typing-extensions==4.12.2
-torch==2.1.0
-torchvision==0.16.0
-torchaudio==2.1.0
+torch
+torchvision
+torchaudio
