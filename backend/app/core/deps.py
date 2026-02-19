@@ -35,8 +35,16 @@ async def get_current_user(
         
     print(f"DEBUG: Token preview: {token[:20]}...")  # Keeping this temporarily
     
-    payload = decode_access_token(token)
+    try:
+        payload = decode_access_token(token)
+        print(f"DEBUG: decode_access_token result: {payload}")
+        print(f"DEBUG: payload type: {type(payload)}")
+    except Exception as e:
+        print(f"DEBUG: decode_access_token EXCEPTION: {e}")
+        raise HTTPException(status_code=401, detail=f"Decode error: {e}")
+    
     if payload is None:
+        print("DEBUG: payload is None - token invalid/expired")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid/expired token")
     
     user_id = payload.get("sub")
