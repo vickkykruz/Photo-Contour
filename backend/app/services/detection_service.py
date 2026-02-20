@@ -40,11 +40,16 @@ def run_yolo_detection(db: Session, image_id: int) -> DetectionResult:
     if image is None:
         raise ValueError("Image not found")
     
-    if not image.filepath or not Path(image.filepath).exists():
-        raise ValueError("Image file not found")
+    correct_filepath = image.filepath.replace("app/static/uploads/", "static/uploads/")
+    
+    print(f"🔍 Original: {image.filepath}")
+    print(f"🔍 Corrected: {correct_filepath}")
+    
+    if not Path(correct_filepath).exists():  # Also fix this check!
+        raise ValueError(f"Corrected image file not found: {correct_filepath}")
     
     # Run YOLOv8 inference
-    payload = {"image_path": image.filepath}
+    payload = {"image_path": correct_filepath}
     try:
         resp = requests.post(YOLO_SERVICE_URL, json=payload, timeout=30)
     except requests.RequestException as e:
