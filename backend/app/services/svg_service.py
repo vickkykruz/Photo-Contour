@@ -7,7 +7,6 @@
 """
 
 
-import cv2
 import base64
 from pathlib import Path
 from PIL import Image as PilImage
@@ -15,7 +14,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
 from app.models import Image
-from app.schemas.hotspots import DetectionResult, HotspotCreate, SvgResponse, BBox
+from app.schemas.hotspots import HotspotCreate, SvgResponse
 from app.services import detection_service
 
 
