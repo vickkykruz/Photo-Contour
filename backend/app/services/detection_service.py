@@ -10,6 +10,7 @@
 import cv2
 import numpy as np
 import torch
+import requests
 from ultralytics import YOLO
 from typing import List, Dict
 from pathlib import Path
@@ -19,18 +20,7 @@ from app.models import Image
 from app.schemas.hotspots import BBox, DetectedObject, DetectionResult
 
 
-# CRITICAL: Override torch.load to use weights_only=False for YOLO models
-original_torch_load = torch.load
-def safe_torch_load(f, map_location=None, **kwargs):
-    """Override torch.load to allow YOLO .pt files."""
-    return original_torch_load(f, map_location=map_location, weights_only=False, **kwargs)
-torch.load = safe_torch_load
-
-
-# Load YOLOv8 model ONCE at module import (singleton pattern)
-_model = YOLO("yolov8n-seg.pt")  # nano segmentation model (fast)
-_model.to("cpu")
-
+YOLO_SERVICE_URL = "http://localhost:8002/detect"
 
 # Basic Object detection
 COCO_CLASSES = [
@@ -59,69 +49,25 @@ def run_yolo_detection(db: Session, image_id: int) -> DetectionResult:
         raise ValueError("Image file not found")
     
     # Run YOLOv8 inference
-    results = _model(
-        image.filepath,
-        verbose=False,
-        device='cpu',
-        imgsz=640,
-        conf=0.25,
-        retina_masks=True)[0]
+    payload = {"image_path": image.filepath}
+    try:
+        resp = requests.post(YOLO_SERVICE_URL, json=payload, timeout=30)
+    except requests.RequestException as e:
+        raise RuntimeError(f"YOLO service unreachable: {e}")
+
+    if resp.status_code != 200:
+        raise RuntimeError(f"YOLO service error: {resp.status_code} {resp.text}")
     
-    objects = []
-    img_h, img_w = results.orig_shape
+    data = resp.json()
 
-    for i, r in enumerate(results):
-        if r.masks is not None:
-            # Get contour points directly from mask (hugs object shape)
-            contour = r.masks.xy[0].astype(np.int32)  # [[x1,y1], [x2,y2], ...]
-            
-            # Convert to normalized SVG coordinates (0-1 scale)
-            contour_svg = [(pt[0]/img_w, pt[1]/img_h) for pt in contour]
-            
-            objects.append({
-                "id": i,
-                "label": _model.names[int(r.boxes.cls[0])],
-                "score": float(r.boxes.conf[0]),
-                "contour": contour_svg,  # Exact object outline points
-                "bbox": {  # Fallback rectangle for reference
-                    "x1": float(r.boxes.xyxy[0][0]/img_w),
-                    "y1": float(r.boxes.xyxy[0][1]/img_w),
-                    "x2": float(r.boxes.xyxy[0][2]/img_w),
-                    "y2": float(r.boxes.xyxy[0][3]/img_w),
-                }
-            })
+    objects = [
+        DetectedObject(
+            id=o["id"],
+            label=o["label"],
+            score=o["score"],
+            bbox=BBox(**o["bbox"])
+        )
+        for o in data["objects"]
+    ]
 
-    
-    return {"image_id": image_id, "width": img_w, "height": img_h, "objects": objects}
-
-
-def run_fake_detection(db: Session, image_id: int) -> DetectionResult:
-    """
-    Return a fake detection result for the given image.
-
-    Uses the stored image dimensions to create a bounding box
-    in the center of the image.
-    """
-    image: Image | None = db.query(Image).filter(Image.id == image_id).first()
-    if image is None:
-        raise ValueError("Image not found")
-
-    # Fallback dimensions if not set
-    width = image.width or 400
-    height = image.height or 400
-
-    # Simple central box (50% of width/height)
-    box_w = int(width * 0.5)
-    box_h = int(height * 0.5)
-    x = int((width - box_w) / 2)
-    y = int((height - box_h) / 2)
-
-    bbox = BBox(x=x, y=y, width=box_w, height=box_h)
-    detected = DetectedObject(
-        id=0,
-        label="object",   # later: 'poster', etc.
-        score=0.9,
-        bbox=bbox,
-    )
-
-    return DetectionResult(image_id=image_id, objects=[detected])
+    return DetectionResult(image_id=image_id, objects=objects)
