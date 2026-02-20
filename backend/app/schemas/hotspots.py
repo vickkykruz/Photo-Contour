@@ -37,8 +37,8 @@ class DetectedObject(BaseModel):
 class DetectionResult(BaseModel):
     """List of detected objects for an image."""
     image_id: int
-    width: int
-    height: int
+    width: Optional[float] = None
+    height: Optional[float] = None
     objects: List[DetectedObject]
     
     

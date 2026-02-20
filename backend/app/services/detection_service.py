@@ -10,6 +10,7 @@
 import os
 import requests
 from pathlib import Path
+from PIL import Image as PILImage
 from sqlalchemy.orm import Session
 
 from app.models import Image
@@ -52,6 +53,10 @@ def run_yolo_detection(db: Session, image_id: int) -> DetectionResult:
     if not Path(abs_filepath).exists():  # Also fix this check!
         raise ValueError(f"Absolute image file not found: {abs_filepath}")
     
+    # Get image dimensions from file
+    pil_img = PILImage.open(abs_filepath)
+    img_width, img_height = pil_img.size
+    
     # Run YOLOv8 inference
     payload = {"image_path": abs_filepath}
     try:
@@ -75,4 +80,4 @@ def run_yolo_detection(db: Session, image_id: int) -> DetectionResult:
         for o in data["objects"]
     ]
 
-    return DetectionResult(image_id=image_id, objects=objects)
+    return DetectionResult(image_id=image_id, objects=objects, width=img_width, height=img_height)
