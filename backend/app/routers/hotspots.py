@@ -7,7 +7,7 @@
 """
 
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from app.db.base import get_db
@@ -38,3 +38,31 @@ def generate_svg(hotspot: HotspotCreate, db: Session = Depends(get_db), current_
     and attaches the provided text and link.
     """
     return svg_service.generate_interactive_svg(db, hotspot)
+
+
+@router.get("/{image_id}/{object_id}/download-svg", response_class=Response)
+def download_svg(
+    image_id: int,
+    object_id: int,
+    text: str = "object",
+    link: str = "https://example.com",
+    db: Session = Depends(get_db)
+):
+    hotspot = HotspotCreate(
+        image_id=image_id,
+        object_id=object_id,
+        text=text,
+        link=link,
+    )
+
+    result = svg_service.generate_interactive_svg(db, hotspot)
+
+    return Response(
+        content=result.svg,
+        media_type="image/svg+xml",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="image_{image_id}_obj_{object_id}_{text}.svg"'
+            ),
+        },
+    )
