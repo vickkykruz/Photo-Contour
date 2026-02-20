@@ -83,4 +83,4 @@ def generate_interactive_svg(
     </text>
     </svg>"""
 
-    return SvgResponse(svg=svg, preview_url=f"/images/{image.id}/file")
+    return SvgResponse(image_id=image.id, svg=svg, preview_url=f"/images/{image.id}/file")

@@ -55,3 +55,4 @@ class SvgResponse(BaseModel):
     """Generated SVG document as a string."""
     image_id: int
     svg: str
+    preview_url: str
