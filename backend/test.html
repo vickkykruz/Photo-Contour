@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Photo Contour Detection</title>
+</head>
+<body>
+    <h1>Live Object Detection</h1>
+    <img id="sourceImg" src="/static/uploads/cat.jpg" style="max-width: 500px;">
+    <svg id="detectionOverlay" style="position: absolute; top: 100px;"></svg>
+    
+    <script>
+        fetch('/hotspots/detect/2')
+            .then(r => r.json())
+            .then(data => {
+                const img = document.getElementById('sourceImg');
+                const svg = document.getElementById('detectionOverlay');
+                svg.setAttribute('width', data.width);
+                svg.setAttribute('height', data.height);
+                
+                data.objects.forEach(obj => {
+                    // Bounding box (fallback)
+                    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    rect.setAttribute('x', obj.bbox.x1 * data.width);
+                    rect.setAttribute('y', obj.bbox.y1 * data.height);
+                    rect.setAttribute('width', (obj.bbox.x2 - obj.bbox.x1) * data.width);
+                    rect.setAttribute('height', (obj.bbox.y2 - obj.bbox.y1) * data.height);
+                    rect.setAttribute('fill', 'none');
+                    rect.setAttribute('stroke', obj.label === 'cat' ? 'lime' : 'red');
+                    rect.setAttribute('stroke-width', 2);
+                    svg.appendChild(rect);
+                    
+                    // Contour (precise segmentation)
+                    if (obj.contour) {
+                        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                        const d = obj.contour.map(([x, y]) => 
+                            `${x * data.width},${y * data.height}`
+                        ).join(' L ');
+                        path.setAttribute('d', `M ${d} Z`);
+                        path.setAttribute('fill', 'rgba(0,255,0,0.3)');
+                        path.setAttribute('stroke', 'lime');
+                        path.setAttribute('stroke-width', 1);
+                        svg.appendChild(path);
+                    }
+                });
+            });
+    </script>
+</body>
+</html>
