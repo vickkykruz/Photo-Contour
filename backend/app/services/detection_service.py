@@ -7,12 +7,7 @@
 """
 
 
-import cv2
-import numpy as np
-import torch
 import requests
-from ultralytics import YOLO
-from typing import List, Dict
 from pathlib import Path
 from sqlalchemy.orm import Session
 
