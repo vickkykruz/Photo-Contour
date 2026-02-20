@@ -21,10 +21,8 @@ class BBox(BaseModel):
     """Axis-aligned bounding box in image coordinates."""
     x1: float
     y1: float
-    x2: float  
+    x2: float
     y2: float
-    width: float
-    height: float
     
     
 class DetectedObject(BaseModel):
