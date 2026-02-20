@@ -48,6 +48,7 @@ class HotspotCreate(BaseModel):
     object_id: int       # index of selected detected object
     text: str
     link: str
+    color: Optional[str] = "#3b82f6"
     
     
 class SvgResponse(BaseModel):
