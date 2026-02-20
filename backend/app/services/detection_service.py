@@ -7,6 +7,7 @@
 """
 
 
+import os
 import requests
 from pathlib import Path
 from sqlalchemy.orm import Session
@@ -40,16 +41,19 @@ def run_yolo_detection(db: Session, image_id: int) -> DetectionResult:
     if image is None:
         raise ValueError("Image not found")
     
+    abs_filepath = os.path.abspath(image.filepath)
+    
     correct_filepath = image.filepath.replace("app/static/uploads/", "static/uploads/")
     
     print(f"🔍 Original: {image.filepath}")
     print(f"🔍 Corrected: {correct_filepath}")
+    print(f"🔍 Absolute: {abs_filepath}")
     
-    if not Path(correct_filepath).exists():  # Also fix this check!
-        raise ValueError(f"Corrected image file not found: {correct_filepath}")
+    if not Path(abs_filepath).exists():  # Also fix this check!
+        raise ValueError(f"Absolute image file not found: {abs_filepath}")
     
     # Run YOLOv8 inference
-    payload = {"image_path": correct_filepath}
+    payload = {"image_path": abs_filepath}
     try:
         resp = requests.post(YOLO_SERVICE_URL, json=payload, timeout=30)
     except requests.RequestException as e:
