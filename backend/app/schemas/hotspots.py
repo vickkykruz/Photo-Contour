@@ -8,7 +8,7 @@
 
 
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 
 class Point(BaseModel):
@@ -30,7 +30,7 @@ class DetectedObject(BaseModel):
     id: int              # simple index
     label: str           # e.g. 'poster'
     score: float         # confidence (stubbed)
-    contour: List[List[float]]  # [[x1,y1], [x2,y2], ...] normalized 0-1
+    contour: Optional[List[List[float]]] = None  # [[x1,y1], [x2,y2], ...] normalized 0-1
     bbox: BBox
     
     

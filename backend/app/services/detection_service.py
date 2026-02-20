@@ -69,7 +69,8 @@ def run_yolo_detection(db: Session, image_id: int) -> DetectionResult:
             id=o["id"],
             label=o["label"],
             score=o["score"],
-            bbox=BBox(**o["bbox"])
+            bbox=BBox(**o["bbox"]),
+            contour=o.get("contour", [])
         )
         for o in data["objects"]
     ]
