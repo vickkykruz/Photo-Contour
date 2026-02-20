@@ -27,7 +27,7 @@ def detect_objects(image_id: int, db: Session = Depends(get_db), current_user: U
 
     Returns object contours (not rectangles).
     """
-    result = detection_service.run_yolo_segmentation(db, image_id)
+    result = detection_service.run_yolo_detection(db, image_id)
     return DetectionResult(**result)
     
     
