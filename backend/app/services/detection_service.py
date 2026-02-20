@@ -9,6 +9,7 @@
 
 import cv2
 import numpy as np
+import torch
 from ultralytics import YOLO
 from typing import List, Dict
 from pathlib import Path
@@ -16,6 +17,14 @@ from sqlalchemy.orm import Session
 
 from app.models import Image
 from app.schemas.hotspots import BBox, DetectedObject, DetectionResult
+
+
+# CRITICAL: Override torch.load to use weights_only=False for YOLO models
+original_torch_load = torch.load
+def safe_torch_load(f, map_location=None, **kwargs):
+    """Override torch.load to allow YOLO .pt files."""
+    return original_torch_load(f, map_location=map_location, weights_only=False, **kwargs)
+torch.load = safe_torch_load
 
 
 # Load YOLOv8 model ONCE at module import (singleton pattern)
