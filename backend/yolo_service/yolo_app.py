@@ -74,7 +74,7 @@ def detect(req: DetectRequest):
             label = _model.names[cls]
             
             # 🔥 GET CONTOUR from segmentation mask (the magic!)
-            mask_xy = results.masks.xy[i].cpu().numpy()  # [[x1,y1], [x2,y2], ...]
+            mask_xy = results.masks.xy[i]  # [[x1,y1], [x2,y2], ...]
             
             # Normalize contour points to 0-1 (for SVG viewBox)
             contour_normalized = [[float(pt[0]/img_w), float(pt[1]/img_h)] 
