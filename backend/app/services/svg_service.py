@@ -36,7 +36,7 @@ def generate_interactive_svg(
     hotspot: HotspotCreate,
 ) -> SvgResponse:
     image = db.query(Image).filter(Image.id == hotspot.image_id).first()
-    detection_result = detection_service.run_yolo_segmentation(db, hotspot.image_id)
+    detection_result = detection_service.run_yolo_detection(db, hotspot.image_id)
     
     obj = next((o for o in detection_result["objects"] if o["id"] == hotspot.object_id), None)
     if not image or not obj:
