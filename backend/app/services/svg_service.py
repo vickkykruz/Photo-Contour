@@ -47,6 +47,10 @@ def generate_interactive_svg(
     scaled_points = [(x * w, y * h) for x, y in contour_points]
     path_data = "M " + " ".join([f"{x:.1f},{y:.1f}" for x, y in scaled_points]) + " Z"
     
+    print("Image size:", w, h)
+    print("First 5 contour points (raw):", contour_points[:5])
+    print("First 5 contour points (scaled):", scaled_points[:5])
+    
     # ✅ FIXED: User-controlled styling (not system colors)
     # User picks color via frontend or defaults to professional blue
     stroke_color = hotspot.color or "#3b82f6"  # Blue (tailwind-blue-500)
