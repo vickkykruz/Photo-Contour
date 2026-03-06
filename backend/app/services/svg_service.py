@@ -19,16 +19,16 @@ from app.services import detection_service
 
 
 
-def _image_to_base64(filepath: str) -> tuple[str, int, int]:
-    """Convert image file to data URI + dimensions."""
-    with open(filepath, "rb") as f:
-        data = base64.b64encode(f.read()).decode()
+# def _image_to_base64(filepath: str) -> tuple[str, int, int]:
+#     """Convert image file to data URI + dimensions."""
+#     with open(filepath, "rb") as f:
+#         data = base64.b64encode(f.read()).decode()
     
-    with PilImage.open(filepath) as img:
-        w, h = img.size
+#     with PilImage.open(filepath) as img:
+#         w, h = img.size
     
-    mime = f"image/{Path(filepath).suffix.lstrip('.')}"
-    return f"data:{mime};base64,{data}", w, h
+#     mime = f"image/{Path(filepath).suffix.lstrip('.')}"
+#     return f"data:{mime};base64,{data}", w, h
 
 
 def generate_interactive_svg(
@@ -57,34 +57,124 @@ def generate_interactive_svg(
     
     # Embed image
     with open(image.filepath, "rb") as f:
-        img_data = base64.b64encode(f.read()).decode()    
+        img_data = base64.b64encode(f.read()).decode()
+        
+    # ── Popup card positioning ────────────────────────────────────────────────
+    # Use the object's bounding box (normalized) to place the popup nearby
+    bbox_x1 = obj.bbox.x1 * w
+    bbox_y1 = obj.bbox.y1 * h
+    bbox_x2 = obj.bbox.x2 * w
+    bbox_y2 = obj.bbox.y2 * h
+    bbox_cx = (bbox_x1 + bbox_x2) / 2
+
+    popup_w = min(200, w * 0.85)
+    popup_h = 96
+
+    # Horizontally center on the object; clamp inside image bounds
+    popup_x = max(4, min(bbox_cx - popup_w / 2, w - popup_w - 4))
+
+    # Prefer placing popup above the object; fall back to below
+    if bbox_y1 > popup_h + 20:
+        popup_y = bbox_y1 - popup_h - 12
+    else:
+        popup_y = bbox_y2 + 12
+
+    # Final clamp so card never leaves the image
+    popup_y = max(4, min(popup_y, h - popup_h - 4))
+
+    # ── Text truncation (SVG has no native wrapping) ─────────────────────────
+    line1 = hotspot.text[:38]
+    line2 = hotspot.text[38:76] if len(hotspot.text) > 38 else ""
+    line2_svg = (
+        f'<text x="{popup_x + 10:.1f}" y="{popup_y + 58:.1f}" '
+        f'font-family="Arial, sans-serif" font-size="11" fill="#374151">{line2}</text>'
+        if line2 else ""
+    )
     
-    # ✅ Production SVG - USER annotation focused
+    # ── SVG ──────────────────────────────────────────────────────────────────
     svg = f"""<?xml version="1.0" encoding="UTF-8"?>
-    <svg xmlns="http://www.w3.org/2000/svg" 
+    <svg xmlns="http://www.w3.org/2000/svg"
         xmlns:xlink="http://www.w3.org/1999/xlink"
-        width="{w}" height="{h}" viewBox="0 0 {w} {h}">
-    
-    <!-- User's uploaded image -->
-    <image href="data:image/jpeg;base64,{img_data}" x="0" y="0" width="{w}" height="{h}"/>
-    
-    <!-- USER'S annotation (clickable) -->
-    <a href="{hotspot.link}" target="_blank">
-        <path d="{path_data}"
-            fill="rgba(59,130,246,0.2)"
+        viewBox="0 0 {w} {h}"
+        style="width:100%;height:auto;display:block;max-height:100vh;">
+
+    <style>
+        .hotspot-path  {{ cursor: pointer; }}
+        .hotspot-path:hover {{ fill: rgba(59,130,246,0.35); }}
+        .popup         {{ visibility: hidden; opacity: 0; transition: opacity 0.18s; pointer-events: none; }}
+        .hotspot-group:hover .popup {{ visibility: visible; opacity: 1; pointer-events: all; }}
+        .visit-btn rect {{ transition: fill 0.15s; }}
+        .visit-btn:hover rect {{ fill: #1d4ed8; }}
+    </style>
+
+    <!-- Original image -->
+    <image href="data:image/jpeg;base64,{img_data}"
+            x="0" y="0" width="{w}" height="{h}"
+            preserveAspectRatio="xMidYMid meet"/>
+
+    <!-- Interactive group: contour + popup card -->
+    <g class="hotspot-group">
+
+        <!-- Object contour path -->
+        <path class="hotspot-path"
+            d="{path_data}"
+            fill="rgba(59,130,246,0.18)"
             stroke="{stroke_color}"
-            stroke-width="4"
+            stroke-width="2.5"
             stroke-linejoin="round"
             stroke-linecap="round">
-        <title>{hotspot.text} - Click to visit</title>
-        <animate attributeName="opacity" values="0.8;1;0.8" dur="3s" repeatCount="indefinite"/>
+        <animate attributeName="stroke-opacity"
+                values="0.5;1;0.5" dur="2.5s" repeatCount="indefinite"/>
         </path>
-    </a>
-    
-    <!-- Detection confidence (for user reference) -->
-    <text x="10" y="20" font-size="14" fill="#666" font-family="Arial">
-        Detected: {obj.label} ({obj.score:.0%})
-    </text>
+
+        <!-- Popup card (shown on hover) -->
+        <g class="popup">
+
+        <!-- Drop shadow -->
+        <rect x="{popup_x + 3:.1f}" y="{popup_y + 3:.1f}"
+                width="{popup_w:.1f}" height="{popup_h:.1f}"
+                rx="8" ry="8" fill="rgba(0,0,0,0.18)"/>
+
+        <!-- Card body -->
+        <rect x="{popup_x:.1f}" y="{popup_y:.1f}"
+                width="{popup_w:.1f}" height="{popup_h:.1f}"
+                rx="8" ry="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+
+        <!-- Coloured header band -->
+        <rect x="{popup_x:.1f}" y="{popup_y:.1f}"
+                width="{popup_w:.1f}" height="26"
+                rx="8" ry="8" fill="{stroke_color}"/>
+        <!-- Square off the bottom corners of the header -->
+        <rect x="{popup_x:.1f}" y="{popup_y + 18:.1f}"
+                width="{popup_w:.1f}" height="8" fill="{stroke_color}"/>
+
+        <!-- Object label in header -->
+        <text x="{popup_x + popup_w / 2:.1f}" y="{popup_y + 17:.1f}"
+                text-anchor="middle"
+                font-family="Arial, sans-serif" font-size="11"
+                font-weight="bold" fill="white">{obj.label.upper()}</text>
+
+        <!-- User description (up to 2 lines) -->
+        <text x="{popup_x + 10:.1f}" y="{popup_y + 44:.1f}"
+                font-family="Arial, sans-serif" font-size="11"
+                fill="#374151">{line1}</text>
+        {line2_svg}
+
+        <!-- Visit link button -->
+        <a href="{hotspot.link}" target="_blank">
+            <g class="visit-btn">
+            <rect x="{popup_x + popup_w / 2 - 46:.1f}" y="{popup_y + popup_h - 24:.1f}"
+                    width="92" height="20" rx="4" ry="4" fill="{stroke_color}"/>
+            <text x="{popup_x + popup_w / 2:.1f}" y="{popup_y + popup_h - 10:.1f}"
+                    text-anchor="middle"
+                    font-family="Arial, sans-serif" font-size="10"
+                    font-weight="bold" fill="white">Visit Link →</text>
+            </g>
+        </a>
+
+        </g>
+    </g>
+
     </svg>"""
 
     return SvgResponse(image_id=image.id, svg=svg, preview_url=f"/images/{image.id}/file")

@@ -62,7 +62,7 @@ def detect(req: DetectRequest):
     )[0]
     
     objects = []
-    img_w, img_h = results.orig_shape  # Original image dimensions
+    img_h, img_w = results.orig_shape # Original image dimensions
 
     if results.masks is not None:
         for i in range(len(results)):
@@ -77,8 +77,10 @@ def detect(req: DetectRequest):
             mask_xy = results.masks.xy[i]  # [[x1,y1], [x2,y2], ...]
             
             # Normalize contour points to 0-1 (for SVG viewBox)
-            contour_normalized = [[float(pt[0]/img_w), float(pt[1]/img_h)] 
-                                for pt in mask_xy]
+            contour_normalized = [
+                [float(pt[0] / img_w), float(pt[1] / img_h)]
+                for pt in mask_xy
+            ]
             
             objects.append(DetectedObject(
                 id=i,
