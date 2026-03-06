@@ -4,7 +4,7 @@
  */
 
  import client from "./client";
- import { UserCreate, UserLogin, Token, UserOut } from "../types/api";
+ import type { UserCreate, UserLogin, Token, UserOut } from "../types/api";
  
  
  export const authApi = {
