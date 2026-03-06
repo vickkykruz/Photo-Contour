@@ -43,6 +43,8 @@ def generate_interactive_svg(
         raise HTTPException(status_code=404, detail="Image or object not found")
     
     w, h = detection_result.width, detection_result.height
+    
+    # Build contour path (normalized → pixel coords)
     contour_points = obj.contour
     scaled_points = [(x * w, y * h) for x, y in contour_points]
     path_data = "M " + " ".join([f"{x:.1f},{y:.1f}" for x, y in scaled_points]) + " Z"
@@ -59,35 +61,64 @@ def generate_interactive_svg(
     with open(image.filepath, "rb") as f:
         img_data = base64.b64encode(f.read()).decode()
         
+    
+    # ── Proportional scaling ──────────────────────────────────────────────────
+    # Base reference is 400px wide. Everything scales from that.
+    scale       = w / 400.0
+
+    popup_w     = w * 0.42           # ~42% of image width
+    popup_h     = h * 0.22           # ~22% of image height
+    font_label  = max(10, 13 * scale)
+    font_text   = max(9,  11 * scale)
+    font_btn    = max(8,  10 * scale)
+    header_h    = popup_h * 0.28
+    padding     = popup_w * 0.06
+    radius      = max(4, 8 * scale)
+    stroke_w    = max(1.5, 2.5 * scale)
+    btn_w       = popup_w * 0.52
+    btn_h       = popup_h * 0.22
+    shadow_off  = max(2, 3 * scale)
+
     # ── Popup card positioning ────────────────────────────────────────────────
-    # Use the object's bounding box (normalized) to place the popup nearby
     bbox_x1 = obj.bbox.x1 * w
     bbox_y1 = obj.bbox.y1 * h
     bbox_x2 = obj.bbox.x2 * w
     bbox_y2 = obj.bbox.y2 * h
     bbox_cx = (bbox_x1 + bbox_x2) / 2
 
-    popup_w = min(200, w * 0.85)
-    popup_h = 96
-
-    # Horizontally center on the object; clamp inside image bounds
+    # Horizontally center on object; clamp inside image bounds
     popup_x = max(4, min(bbox_cx - popup_w / 2, w - popup_w - 4))
 
     # Prefer placing popup above the object; fall back to below
-    if bbox_y1 > popup_h + 20:
-        popup_y = bbox_y1 - popup_h - 12
+    if bbox_y1 > popup_h + 20 * scale:
+        popup_y = bbox_y1 - popup_h - 12 * scale
     else:
-        popup_y = bbox_y2 + 12
+        popup_y = bbox_y2 + 12 * scale
 
     # Final clamp so card never leaves the image
     popup_y = max(4, min(popup_y, h - popup_h - 4))
 
-    # ── Text truncation (SVG has no native wrapping) ─────────────────────────
-    line1 = hotspot.text[:38]
-    line2 = hotspot.text[38:76] if len(hotspot.text) > 38 else ""
+    # ── Derived positions ─────────────────────────────────────────────────────
+    header_bottom = popup_y + header_h
+    text_y1       = header_bottom + popup_h * 0.22
+    text_y2       = header_bottom + popup_h * 0.42
+    btn_x         = popup_x + (popup_w - btn_w) / 2
+    btn_y         = popup_y + popup_h - btn_h - popup_h * 0.08
+    btn_text_y    = btn_y + btn_h * 0.65
+    label_y       = popup_y + header_h * 0.68
+    shadow_x      = popup_x + shadow_off
+    shadow_y      = popup_y + shadow_off
+
+    # ── Text truncation ───────────────────────────────────────────────────────
+    # Estimate chars per line based on popup width and font size
+    chars_per_line = max(20, int(popup_w / (font_text * 0.6)))
+    line1 = hotspot.text[:chars_per_line]
+    line2 = hotspot.text[chars_per_line: chars_per_line * 2] if len(hotspot.text) > chars_per_line else ""
+
     line2_svg = (
-        f'<text x="{popup_x + 10:.1f}" y="{popup_y + 58:.1f}" '
-        f'font-family="Arial, sans-serif" font-size="11" fill="#374151">{line2}</text>'
+        f'<text x="{popup_x + padding:.1f}" y="{text_y2:.1f}" '
+        f'font-family="Arial, sans-serif" font-size="{font_text:.1f}" '
+        f'fill="#374151">{line2}</text>'
         if line2 else ""
     )
     
@@ -99,9 +130,9 @@ def generate_interactive_svg(
         style="width:100%;height:auto;display:block;max-height:100vh;">
 
     <style>
-        .hotspot-path  {{ cursor: pointer; }}
+        .hotspot-path {{ cursor: pointer; }}
         .hotspot-path:hover {{ fill: rgba(59,130,246,0.35); }}
-        .popup         {{ visibility: hidden; opacity: 0; transition: opacity 0.18s; pointer-events: none; }}
+        .popup {{ visibility: hidden; opacity: 0; transition: opacity 0.18s; pointer-events: none; }}
         .hotspot-group:hover .popup {{ visibility: visible; opacity: 1; pointer-events: all; }}
         .visit-btn rect {{ transition: fill 0.15s; }}
         .visit-btn:hover rect {{ fill: #1d4ed8; }}
@@ -120,7 +151,7 @@ def generate_interactive_svg(
             d="{path_data}"
             fill="rgba(59,130,246,0.18)"
             stroke="{stroke_color}"
-            stroke-width="2.5"
+            stroke-width="{stroke_w:.1f}"
             stroke-linejoin="round"
             stroke-linecap="round">
         <animate attributeName="stroke-opacity"
@@ -131,44 +162,55 @@ def generate_interactive_svg(
         <g class="popup">
 
         <!-- Drop shadow -->
-        <rect x="{popup_x + 3:.1f}" y="{popup_y + 3:.1f}"
+        <rect x="{shadow_x:.1f}" y="{shadow_y:.1f}"
                 width="{popup_w:.1f}" height="{popup_h:.1f}"
-                rx="8" ry="8" fill="rgba(0,0,0,0.18)"/>
+                rx="{radius:.1f}" ry="{radius:.1f}"
+                fill="rgba(0,0,0,0.18)"/>
 
         <!-- Card body -->
         <rect x="{popup_x:.1f}" y="{popup_y:.1f}"
                 width="{popup_w:.1f}" height="{popup_h:.1f}"
-                rx="8" ry="8" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+                rx="{radius:.1f}" ry="{radius:.1f}"
+                fill="white" stroke="#e2e8f0" stroke-width="1"/>
 
         <!-- Coloured header band -->
         <rect x="{popup_x:.1f}" y="{popup_y:.1f}"
-                width="{popup_w:.1f}" height="26"
-                rx="8" ry="8" fill="{stroke_color}"/>
-        <!-- Square off the bottom corners of the header -->
-        <rect x="{popup_x:.1f}" y="{popup_y + 18:.1f}"
-                width="{popup_w:.1f}" height="8" fill="{stroke_color}"/>
+                width="{popup_w:.1f}" height="{header_h:.1f}"
+                rx="{radius:.1f}" ry="{radius:.1f}"
+                fill="{stroke_color}"/>
+        <!-- Square off bottom corners of header -->
+        <rect x="{popup_x:.1f}" y="{header_bottom - radius:.1f}"
+                width="{popup_w:.1f}" height="{radius:.1f}"
+                fill="{stroke_color}"/>
 
         <!-- Object label in header -->
-        <text x="{popup_x + popup_w / 2:.1f}" y="{popup_y + 17:.1f}"
+        <text x="{popup_x + popup_w / 2:.1f}" y="{label_y:.1f}"
                 text-anchor="middle"
-                font-family="Arial, sans-serif" font-size="11"
-                font-weight="bold" fill="white">{obj.label.upper()}</text>
+                font-family="Arial, sans-serif"
+                font-size="{font_label:.1f}"
+                font-weight="bold"
+                fill="white">{obj.label.upper()}</text>
 
-        <!-- User description (up to 2 lines) -->
-        <text x="{popup_x + 10:.1f}" y="{popup_y + 44:.1f}"
-                font-family="Arial, sans-serif" font-size="11"
+        <!-- User description -->
+        <text x="{popup_x + padding:.1f}" y="{text_y1:.1f}"
+                font-family="Arial, sans-serif"
+                font-size="{font_text:.1f}"
                 fill="#374151">{line1}</text>
         {line2_svg}
 
         <!-- Visit link button -->
         <a href="{hotspot.link}" target="_blank">
             <g class="visit-btn">
-            <rect x="{popup_x + popup_w / 2 - 46:.1f}" y="{popup_y + popup_h - 24:.1f}"
-                    width="92" height="20" rx="4" ry="4" fill="{stroke_color}"/>
-            <text x="{popup_x + popup_w / 2:.1f}" y="{popup_y + popup_h - 10:.1f}"
+            <rect x="{btn_x:.1f}" y="{btn_y:.1f}"
+                    width="{btn_w:.1f}" height="{btn_h:.1f}"
+                    rx="{radius * 0.5:.1f}" ry="{radius * 0.5:.1f}"
+                    fill="{stroke_color}"/>
+            <text x="{btn_x + btn_w / 2:.1f}" y="{btn_text_y:.1f}"
                     text-anchor="middle"
-                    font-family="Arial, sans-serif" font-size="10"
-                    font-weight="bold" fill="white">Visit Link →</text>
+                    font-family="Arial, sans-serif"
+                    font-size="{font_btn:.1f}"
+                    font-weight="bold"
+                    fill="white">Visit Link \u2192</text>
             </g>
         </a>
 
