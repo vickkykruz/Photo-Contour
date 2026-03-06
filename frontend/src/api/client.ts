@@ -34,10 +34,3 @@
  );
  
  export default client;
- ```
- 
- ---
- 
- Then create a `.env` file in the `frontend/` root (not inside `src/`) with this:
- ```
- VITE_API_URL=http://localhost:8000
