@@ -67,9 +67,6 @@
      ? `${base}/images/${activeImage.id}/file?token=${token}`
      : null;
  
-   // Natural image dimensions from detection result
-   const natW = detection?.width  ?? activeImage?.width  ?? 1;
-   const natH = detection?.height ?? activeImage?.height ?? 1;
  
    return (
      <div style={{
@@ -189,7 +186,7 @@
                    // Scale bbox to rendered size
                    const bx1 = obj.bbox.x1 * renderedSize.w;
                    const by1 = obj.bbox.y1 * renderedSize.h;
-                   const bx2 = obj.bbox.x2 * renderedSize.w;
+                   
                    const by2 = obj.bbox.y2 * renderedSize.h;
                    const labelX = bx1;
                    const labelY = by1 > 18 ? by1 - 6 : by2 + 14;
