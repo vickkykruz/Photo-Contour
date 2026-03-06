@@ -19,7 +19,7 @@ import os
 app = FastAPI(title="YOLO Segmentation Service - Contour Detection")
 
 # Load model once
-_model = YOLO("yolov8n-seg.pt")  # detection model
+_model = YOLO("yolov8s-seg.pt")  # detection model
 _model.to("cpu")
 
 
@@ -57,6 +57,7 @@ def detect(req: DetectRequest):
         source=req.image_path,
         device="cpu",
         imgsz=640,
+        conf=0.15,
         verbose=False,
         retina_masks=True  # High-res masks for precise contours
     )[0]
