@@ -19,6 +19,7 @@ from app.models import Image
 from app.config import settings
 from app.core.deps import get_current_user
 from app.models import User
+from app.services.image_service import check_image_quality
 
 
 router = APIRouter(prefix="/images", tags=["images"])
@@ -33,6 +34,7 @@ async def upload_image(
     """
     Upload a new image.
     
+    Validates image quality (resolution + sharpness) before saving.
     Saves file to static/uploads/ and creates database record.
     """
     if not file.content_type.startswith("image/"):
@@ -45,8 +47,15 @@ async def upload_image(
     # Save file
     with open(filepath, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    
-    # Create DB record
+        
+    # ── Quality validation ────────────────────────────────────────────────────
+    passed, reason = check_image_quality(filepath)
+    if not passed:
+        # Remove the file — we don't want to keep rejected uploads
+        os.remove(filepath)
+        raise HTTPException(status_code=422, detail=reason)
+
+    # Quality passed — create DB record
     image = services.save_uploaded_image(db, filepath, filename)
     
     return image
