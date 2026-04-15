@@ -8,28 +8,30 @@
 
 from pydantic_settings import BaseSettings
 from typing import List
-import os
+
 
 class Settings(BaseSettings):
-    # Database
-    DATABASE_URL: str = "sqlite:///./photo_contour.db"
-    
-    # Project paths
-    UPLOAD_DIR: str = "./static/uploads"
-    
-    # CORS for frontend
-    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
-    
-    # Server
+
+    # ── Project ───────────────────────────────────────────────────────────
     PROJECT_NAME: str = "Photo Contour API"
-    VERSION: str = "0.1.0"
-    
-    JWT_SECRET_KEY: str = "photo-contour-dev-secret-key-change-me"
-    JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-    
+    VERSION:      str = "0.1.0"
+
+    # ── CORS ─────────────────────────────────────────────────────────────
+    BACKEND_CORS_ORIGINS: List[str] = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://vickkykruzprogramming.dev",
+    ]
+
+    # ── Firebase ──────────────────────────────────────────────────────────
+    FIREBASE_CREDENTIALS_PATH: str = "./firebase-credentials.json"
+    FIREBASE_STORAGE_BUCKET:   str = ""  # e.g. photo-contour-xxxxx.appspot.com
+
+    # ── Upload (temp dir for YOLO processing) ────────────────────────────
+    UPLOAD_DIR: str = "./static/uploads"
+
     class Config:
         env_file = ".env"
 
-# Global settings instance
+
 settings = Settings()

@@ -8,51 +8,44 @@
 
 
 from fastapi import Depends, HTTPException, status
-#from fastapi.security import OAuth2PasswordBearer
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
-
-from app.db.base import get_db
-from app.models import User
-from app.core.security import decode_access_token
+from firebase_admin import auth as firebase_auth
+from app.core.firebase import db
 
 
-#oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 security = HTTPBearer()
 
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db),
-) -> User:
-    """Extract user from Bearer token."""
+) -> dict:
+    """
+    Verify Firebase ID token and return the decoded token payload.
+    The uid field is the user's unique Firebase ID.
+    """
     if credentials.scheme != "Bearer":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid auth scheme")
-    
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid auth scheme"
+        )
+
     token = credentials.credentials
-    if token.startswith("Bearer "):
-        token = token[7:]  # Remove "Bearer " prefix
-        
-    # print(f"DEBUG: Token preview: {token[:20]}...")  # Keeping this temporarily
-    
+
     try:
-        payload = decode_access_token(token)
-        print(f"DEBUG: decode_access_token result: {payload}")
-        print(f"DEBUG: payload type: {type(payload)}")
+        decoded = firebase_auth.verify_id_token(token)
+        return decoded
+    except firebase_auth.ExpiredIdTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired. Please sign in again."
+        )
+    except firebase_auth.InvalidIdTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token. Please sign in again."
+        )
     except Exception as e:
-        print(f"DEBUG: decode_access_token EXCEPTION: {e}")
-        raise HTTPException(status_code=401, detail=f"Decode error: {e}")
-    
-    if payload is None:
-        print("DEBUG: payload is None - token invalid/expired")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid/expired token")
-    
-    user_id = payload.get("sub")
-    if user_id is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token structure")
-    
-    user = db.query(User).filter(User.id == user_id).first()
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-    
-    return user
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Authentication failed: {str(e)}"
+        )

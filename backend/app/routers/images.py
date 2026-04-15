@@ -8,88 +8,93 @@
 
 import os
 import shutil
+import tempfile
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
+from fastapi.responses import RedirectResponse
 from typing import List
 
-from app import schemas, services
-from app.db.base import get_db
-from app.models import Image
-from app.config import settings
 from app.core.deps import get_current_user
-from app.models import User
-from app.services.image_service import check_image_quality
+from app.config import settings
+from app.services.image_service import (
+    check_image_quality,
+    save_uploaded_image,
+    get_image_by_id,
+    list_images,
+)
 
 
 router = APIRouter(prefix="/images", tags=["images"])
 
 
-@router.post("/", response_model=schemas.ImageResponse)
+@router.post("/")
 async def upload_image(
-    file: UploadFile = File(..., description="Image file to upload"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
 ):
-    """
-    Upload a new image.
-    
-    Validates image quality (resolution + sharpness) before saving.
-    Saves file to static/uploads/ and creates database record.
-    """
+    """Upload image to Firebase Storage after quality validation."""
+
     if not file.content_type.startswith("image/"):
-        raise HTTPException(400, "File must be an image")
-    
-    # Generate unique filename
-    filename = f"{file.filename}"
-    filepath = os.path.join(settings.UPLOAD_DIR, filename)
-    
-    # Save file
-    with open(filepath, "wb") as buffer:
+        raise HTTPException(status_code=400, detail="File must be an image.")
+
+    # Save temporarily for quality check and YOLO processing
+    suffix   = os.path.splitext(file.filename)[1]
+    tmp_path = os.path.join(settings.UPLOAD_DIR, f"tmp_{file.filename}")
+
+    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+    with open(tmp_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-        
-    # ── Quality validation ────────────────────────────────────────────────────
-    passed, reason = check_image_quality(filepath)
+
+    # Quality check
+    passed, reason = check_image_quality(tmp_path)
     if not passed:
-        # Remove the file — we don't want to keep rejected uploads
-        os.remove(filepath)
+        os.remove(tmp_path)
         raise HTTPException(status_code=422, detail=reason)
 
-    # Quality passed — create DB record
-    image = services.save_uploaded_image(db, filepath, filename)
-    
+    # Upload to Firebase Storage
+    try:
+        image = save_uploaded_image(
+            uid=current_user["uid"],
+            filepath=tmp_path,
+            filename=file.filename,
+        )
+    finally:
+        # Always clean up temp file
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
     return image
 
 
-@router.get("/{image_id}", response_model=schemas.ImageResponse)
-def get_image(image_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+@router.get("/")
+def list_user_images(
+    current_user: dict = Depends(get_current_user),
+):
+    """List all images for the current user."""
+    return list_images(uid=current_user["uid"])
+
+
+@router.get("/{image_id}")
+def get_image(
+    image_id: str,
+    current_user: dict = Depends(get_current_user),
+):
     """Get image metadata by ID."""
-    image = services.get_image_by_id(db, image_id)
+    image = get_image_by_id(image_id, uid=current_user["uid"])
     if not image:
-        raise HTTPException(404, "Image not found")
+        raise HTTPException(status_code=404, detail="Image not found")
     return image
-
-
-@router.get("/", response_model=List[schemas.ImageResponse])
-def list_images(db: Session = Depends(get_db)):
-    """List all images (no auth yet)."""
-    images = db.query(Image).all()
-    return images
 
 
 @router.get("/{image_id}/file")
-def get_image_file(image_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_image_file(
+    image_id: str,
+    current_user: dict = Depends(get_current_user),
+):
     """
-    Return the raw image file for a given image ID.
-
-    This will be used by the studio frontend to display
-    the original image in the browser.
+    Redirect to the Firebase Storage public URL for this image.
+    The frontend img tag follows the redirect automatically.
     """
-    image = services.get_image_by_id(db, image_id)
+    image = get_image_by_id(image_id, uid=current_user["uid"])
     if not image:
-        raise HTTPException(404, "Image not found")
-    
-    if not os.path.exists(image.filepath):
-        raise HTTPException(404, "Image file not found on disk")
-    
-    return FileResponse(image.filepath, media_type="image/*", filename=image.filename)
+        raise HTTPException(status_code=404, detail="Image not found")
+    return RedirectResponse(url=image["url"])
