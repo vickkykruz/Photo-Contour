@@ -8,76 +8,82 @@
 
 
 import os
+import uuid
+import tempfile
 import requests
 from pathlib import Path
 from PIL import Image as PILImage
-from sqlalchemy.orm import Session
 
-from app.models import Image
 from app.schemas.hotspots import BBox, DetectedObject, DetectionResult
 
 
 YOLO_SERVICE_URL = "http://localhost:8002/detect"
 
-# # Basic Object detection
-# COCO_CLASSES = [
-#     "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", 
-#     "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench",
-#     "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra",
-#     "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee",
-#     "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove",
-#     "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup",
-#     "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange",
-#     "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch",
-#     "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse",
-#     "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink",
-#     "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier",
-#     "toothbrush"
-# ]
 
+def run_yolo_detection(image_dict: dict) -> DetectionResult:
+    """
+    Run YOLOv8 detection on an image stored in Firebase Storage.
 
-def run_yolo_detection(db: Session, image_id: int) -> DetectionResult:
-    """Run REAL YOLOv8 detection on the image."""
-    image = db.query(Image).filter(Image.id == image_id).first()
-    if image is None:
-        raise ValueError("Image not found")
-    
-    abs_filepath = os.path.abspath(image.filepath)
-    
-    correct_filepath = image.filepath.replace("app/static/uploads/", "static/uploads/")
-    
-    print(f"🔍 Original: {image.filepath}")
-    print(f"🔍 Corrected: {correct_filepath}")
-    print(f"🔍 Absolute: {abs_filepath}")
-    
-    if not Path(abs_filepath).exists():  # Also fix this check!
-        raise ValueError(f"Absolute image file not found: {abs_filepath}")
-    
-    # Get image dimensions from file
-    pil_img = PILImage.open(abs_filepath)
-    img_width, img_height = pil_img.size
-    
-    # Run YOLOv8 inference
-    payload = {"image_path": abs_filepath}
+    Downloads the image to a temp file, sends it to the YOLO
+    microservice, and returns the DetectionResult.
+    """
+
+    image_url = image_dict.get("url")
+    image_id  = image_dict.get("id")
+
+    if not image_url:
+        raise ValueError("Image has no URL — cannot run detection.")
+
+    # ── Download image from Firebase Storage to temp file ────────────────
+    suffix   = os.path.splitext(image_dict.get("filename", "image.jpg"))[1] or ".jpg"
+    tmp_path = os.path.join(tempfile.gettempdir(), f"yolo_{uuid.uuid4()}{suffix}")
+
     try:
-        resp = requests.post(YOLO_SERVICE_URL, json=payload, timeout=30)
+        response = requests.get(image_url, timeout=30)
+        response.raise_for_status()
+        with open(tmp_path, "wb") as f:
+            f.write(response.content)
     except requests.RequestException as e:
-        raise RuntimeError(f"YOLO service unreachable: {e}")
+        raise RuntimeError(f"Failed to download image from Firebase Storage: {e}")
 
-    if resp.status_code != 200:
-        raise RuntimeError(f"YOLO service error: {resp.status_code} {resp.text}")
-    
-    data = resp.json()
+    try:
+        # ── Get image dimensions ──────────────────────────────────────────
+        pil_img = PILImage.open(tmp_path)
+        img_width, img_height = pil_img.size
 
-    objects = [
-        DetectedObject(
-            id=o["id"],
-            label=o["label"],
-            score=o["score"],
-            bbox=BBox(**o["bbox"]),
-            contour=o.get("contour", [])
+        # ── Call YOLO microservice ────────────────────────────────────────
+        payload = {"image_path": tmp_path}
+        try:
+            resp = requests.post(YOLO_SERVICE_URL, json=payload, timeout=60)
+        except requests.RequestException as e:
+            raise RuntimeError(f"YOLO service unreachable: {e}")
+
+        if resp.status_code != 200:
+            raise RuntimeError(
+                f"YOLO service error: {resp.status_code} {resp.text}"
+            )
+
+        data = resp.json()
+
+        objects = [
+            DetectedObject(
+                id=o["id"],
+                label=o["label"],
+                score=o["score"],
+                bbox=BBox(**o["bbox"]),
+                contour=o.get("contour", [])
+            )
+            for o in data["objects"]
+        ]
+
+        return DetectionResult(
+            image_id=image_id,
+            objects=objects,
+            width=img_width,
+            height=img_height,
         )
-        for o in data["objects"]
-    ]
 
-    return DetectionResult(image_id=image_id, objects=objects, width=img_width, height=img_height)
+    finally:
+        # Always clean up temp file
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)

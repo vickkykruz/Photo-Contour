@@ -41,18 +41,18 @@ class DetectionResult(BaseModel):
     height: Optional[float] = None
     objects: List[DetectedObject]
     
-    
+
 class HotspotCreate(BaseModel):
     """Data needed to create a hotspot and generate SVG."""
-    image_id: int
-    object_id: int       # index of selected detected object
-    text: str
-    link: str
-    color: Optional[str] = "#3b82f6"
+    image_id:  str        # ← changed from int to str
+    object_id: int        # index of selected detected object
+    text:      str
+    link:      str
+    color:     Optional[str] = "#3b82f6"    
     
     
 class SvgResponse(BaseModel):
     """Generated SVG document as a string."""
-    image_id: int
-    svg: str
+    image_id:    str      # ← changed from int to str
+    svg:         str
     preview_url: str

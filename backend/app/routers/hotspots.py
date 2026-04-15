@@ -8,61 +8,70 @@
 
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy.orm import Session
-
-from app.db.base import get_db
 from app.schemas.hotspots import DetectionResult, HotspotCreate, SvgResponse
-from app.services import detection_service, svg_service
+from app.services.detection_service import run_yolo_detection
+from app.services.svg_service import generate_interactive_svg
 from app.core.deps import get_current_user
-from app.models import User
+from app.core.firebase import db
 
 
 router = APIRouter(prefix="/hotspots", tags=["hotspots"])
 
 
 @router.post("/detect/{image_id}", response_model=DetectionResult)
-def detect_objects(image_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """
-    Run YOLOv8 SEGMENTATION on the given image.
-
-    Returns object contours (not rectangles).
-    """
-    result = detection_service.run_yolo_detection(db, image_id)
-    return result
-    
-    
-@router.post("/generate-svg", response_model=SvgResponse)
-def generate_svg(hotspot: HotspotCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """
-    Generate a simple SVG that highlights the selected object
-    and attaches the provided text and link.
-    """
-    return svg_service.generate_interactive_svg(db, hotspot)
-
-
-@router.get("/{image_id}/{object_id}/download-svg", response_class=Response)
-def download_svg(
-    image_id: int,
-    object_id: int,
-    text: str = "object",
-    link: str = "https://example.com",
-    db: Session = Depends(get_db)
+def detect_objects(
+    image_id: str,
+    current_user: dict = Depends(get_current_user),
 ):
+    """Run YOLOv8 segmentation on the given image."""
+
+    # Load image from Firestore
+    doc = db.collection("images").document(image_id).get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    image_dict = doc.to_dict()
+    image_dict["id"] = doc.id
+
+    # Ensure user owns this image
+    if image_dict.get("uid") != current_user.get("uid"):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    return run_yolo_detection(image_dict)
+
+
+@router.post("/generate-svg", response_model=SvgResponse)
+def generate_svg(
+    hotspot: HotspotCreate,
+    current_user: dict = Depends(get_current_user),
+):
+    """Generate interactive SVG for the selected object."""
+    return generate_interactive_svg(hotspot, current_user)
+
+
+@router.get("/{image_id}/{object_id}/download-svg",
+            response_class=Response)
+def download_svg(
+    image_id:  str,
+    object_id: int,
+    text:      str = "object",
+    link:      str = "https://example.com",
+    current_user: dict = Depends(get_current_user),
+):
+    """Download the generated SVG file."""
     hotspot = HotspotCreate(
         image_id=image_id,
         object_id=object_id,
         text=text,
         link=link,
     )
-
-    result = svg_service.generate_interactive_svg(db, hotspot)
-
+    result = generate_interactive_svg(hotspot, current_user)
     return Response(
         content=result.svg,
         media_type="image/svg+xml",
         headers={
             "Content-Disposition": (
-                f'attachment; filename="image_{image_id}_obj_{object_id}_{text}.svg"'
+                f'attachment; filename="photo_contour_{image_id}_{object_id}.svg"'
             ),
         },
     )
