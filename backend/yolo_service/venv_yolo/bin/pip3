@@ -1,4 +1,4 @@
-#!/home/Photo-Contour/backend/yolo_service/venv_yolo/bin/python3.11
+#!/var/www/Photo-Contour/backend/yolo_service/venv_yolo/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys
